@@ -1,0 +1,46 @@
+{
+  "summary": "Full-stack MeraBazaar MVP tested. Backend: 19/20 pytest tests pass (register 500 bug fixed during testing). Frontend: home, header (7 category links, lang toggle, pincode filter), product detail (WA/UPI/ribbons), seller login/dashboard, register→verify wizard (Aadhaar OKYC + FSSAI + GSTIN), create listing all pass end-to-end. One backend bug remains: brute-force 429 lockout does not trigger reliably because request.client.host reflects the k8s ingress pod IP (varies across 2 replicas) and login_attempts identifier is per-IP.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "/api/auth/login", "issue": "Brute-force 429 lockout NOT triggered — 7+ consecutive wrong-password attempts all returned 401. Root cause: `ident = f\"{ip}:{email}\"` uses request.client.host, which behind k8s ingress equals the upstream proxy pod IP and differs between replica pods (observed 10.208.128.6 and 10.208.128.2 in login_attempts collection). Also there are 2 backend replicas so counters are split per pod-IP. Fix: honor X-Forwarded-For (first hop) or use email-only identifier so brute-force is IP-agnostic.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "/api/auth/register", "issue": "Was returning 500 due to mongo _id (ObjectId) in returned user_doc after insert_one. FIXED during testing by popping _id."},
+      {"endpoint": "N/A CORS", "issue": "CORSMiddleware has allow_credentials=True with allow_origins='*' from env — browsers reject wildcard+credentials. Preview works because ingress overrides CORS, but this will break in other envs. Recommend setting CORS_ORIGINS to explicit REACT_APP_BACKEND_URL origin."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Product detail / Hero", "issues": ["Trust ribbons render correctly with navy body + orange left-triangle notch matching spec.", "Hero carousel, pincode filter, EN/HI toggle, category strip, orange search button all match spec.", "Verify wizard success state text 'FSSAI VERIFIED' / 'GSTIN VERIFIED' is small green text — could be reinforced with a green check chip but not blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix brute-force lockout: derive client IP from X-Forwarded-For header (or key attempts by email alone) so 6th failed login → 429 works behind k8s ingress with multiple backend replicas.",
+    "Tighten CORS_ORIGINS in backend/.env to the explicit REACT_APP_BACKEND_URL origin (do not ship allow_credentials=True with '*')."
+  ],
+  "critical_code_review_comments": [
+    "server.py register endpoint mutated insert doc and returned _id → 500 (fixed).",
+    "supabase_mirror() also mutates docs indirectly since insert_one adds _id; ok now because payload filter excludes password_hash, but future callers that pass raw docs may see ObjectId leaks — consider deep-copy before insert_one everywhere.",
+    "get_current_user reads httpOnly cookie OR Bearer — good. Cookies are set with samesite='none' + secure=True — correct for cross-site preview URL.",
+    "seed_users idempotency correctly updates password_hash if the env password rotates.",
+    "Login rate-limit identifier scoping is buggy behind proxy (see HIGH).",
+    "No pagination on /api/listings and no auth on /api/listings — acceptable for MVP but note for later."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (added user_doc.pop('_id', None) in register response)",
+    "/app/backend/tests/backend_test.py (new pytest suite)"
+  ],
+  "success_rate": {"backend": "95% (19/20)", "frontend": "100% (all critical flows)"},
+  "test_credentials": "admin@bazaarly.in / Admin@1234 ; seller@bazaarly.in / Seller@1234 ; Aadhaar OTP 123456 (MOCK)",
+  "seed_data_creation": "Multiple TEST_* users and listings created via API/UI tests; safe to leave (seeded seller listings intact).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend has 2 replicas — any per-request state keyed by request.client.host will be inconsistent. Register 500 bug already fixed. UI is Amazon-style and matches palette. Verify ribbons at [data-testid=mb-ribbon-identity] / [data-testid=mb-ribbon-gov] are styled correctly with orange notch.",
+  "rca of the issue": "Brute-force 429 miss: k8s ingress terminates client TCP; FastAPI's request.client.host resolves to the ingress proxy pod IP which round-robins across replicas, so per-(ip,email) counter never reaches 5 on a single pod. Reproduction: run 7 consecutive POST /api/auth/login with same wrong password — observe all 401 and login_attempts collection shows multiple identifier rows differing only by ip prefix. Mitigation: read X-Forwarded-For[0] or drop ip from identifier."
+}
