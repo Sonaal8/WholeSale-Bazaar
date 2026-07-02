@@ -334,8 +334,10 @@ async def register(body: RegisterBody, response: Response):
 @api.post("/auth/login")
 async def login(body: LoginBody, response: Response, request: Request):
     email = body.email.lower()
-    ip = request.client.host if request.client else "unknown"
-    ident = f"{ip}:{email}"
+    xff = request.headers.get("x-forwarded-for", "")
+    ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else "unknown")
+    # Key by email alone so lockout survives k8s replica switching.
+    ident = f"email:{email}"
 
     attempts_doc = await db.login_attempts.find_one({"identifier": ident})
     if attempts_doc and attempts_doc.get("count", 0) >= 5:
@@ -358,7 +360,7 @@ async def login(body: LoginBody, response: Response, request: Request):
     access = create_access_token(user["id"], user["email"], user["role"])
     refresh = create_refresh_token(user["id"])
     set_auth_cookies(response, access, refresh)
-    await audit(user["id"], "login", "user")
+    await audit(user["id"], "login", "user", {"ip": ip})
     user.pop("password_hash", None)
     user.pop("_id", None)
     return {"user": user, "access_token": access}
