@@ -27,37 +27,37 @@ const cols = (t) => [
 export default function Footer() {
   const { t } = useI18n();
   return (
-    <footer className="mt-16">
-      {/* Back to top */}
-      <a href="#top" className="block text-center py-3 text-white text-[13px] font-medium hover:brightness-110"
-         style={{ background: "#37475A" }}>
-        Back to top
-      </a>
-
-      <div style={{ background: "#232F3E" }} className="text-white">
-        <div className="max-w-[1500px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 px-6 py-10">
+    <footer className="mt-24">
+      <div style={{ background: "var(--mb-accent-deep)" }} className="text-white">
+        <div className="max-w-[1400px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-10 px-6 lg:px-8 py-14">
           {cols(t).map((col) => (
             <div key={col.title}>
-              <h4 className="font-bold text-[15px] mb-3 text-white">{col.title}</h4>
-              <ul className="space-y-2 text-[13px] text-[#DDD]">
+              <h4 className="mb-serif text-[20px] mb-4 text-white">{col.title}</h4>
+              <ul className="space-y-2.5 text-[14px]" style={{ color: "rgba(243,239,234,0.8)" }}>
                 {col.links.map((l) => (
                   <li key={l.label}>
-                    <Link to={l.href} className="text-[#DDD] hover:underline hover:text-white">{l.label}</Link>
+                    <Link to={l.href} className="hover:text-white hover:underline transition-colors"
+                          style={{ color: "rgba(243,239,234,0.85)" }}>
+                      {l.label}
+                    </Link>
                   </li>
                 ))}
               </ul>
             </div>
           ))}
         </div>
-      </div>
-      <div style={{ background: "#131A22" }} className="text-white">
-        <div className="max-w-[1500px] mx-auto px-6 py-6 flex flex-col items-center gap-3">
-          <span className="mb-logo text-[22px]">
-            Mera<span style={{ color: "#FF9900" }}>Bazaar</span>
-            <span className="smile" />
-          </span>
-          <div className="text-[12px] text-[#CFD6DC]">{t("tagline")}</div>
-          <div className="text-[12px] text-[#8B96A2]">{t("copyright")}</div>
+
+        <div className="border-t px-6 lg:px-8" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          <div className="max-w-[1400px] mx-auto py-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex flex-col items-start gap-1">
+              <span className="mb-wordmark mb-serif text-[28px]" style={{ color: "#F3EFEA" }}>
+                Mera<span className="dot" style={{ background: "#D97925" }}></span>
+                <span style={{ color: "#D97925" }}>Bazaar</span>
+              </span>
+              <span className="text-[12px] mb-hindi" style={{ color: "rgba(243,239,234,0.6)" }}>{t("tagline")}</span>
+            </div>
+            <div className="text-[12px]" style={{ color: "rgba(243,239,234,0.55)" }}>{t("copyright")}</div>
+          </div>
         </div>
       </div>
     </footer>

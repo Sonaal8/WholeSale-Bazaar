@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth, formatApiErrorDetail } from "@/context/AuthContext";
 import { useI18n } from "@/i18n";
 import { TID } from "@/constants/testIds";
+import { LogIn } from "lucide-react";
 
 export default function Login() {
   const { t } = useI18n();
@@ -27,44 +28,58 @@ export default function Login() {
   };
 
   return (
-    <div className="max-w-[420px] mx-auto px-4 py-8">
-      <div className="text-center mb-4">
-        <span className="mb-logo text-[26px]" style={{ color: "#0F1111" }}>
-          Mera<span style={{ color: "#FF9900" }}>Bazaar</span>
-          <span className="smile" />
-        </span>
+    <div className="max-w-[440px] mx-auto px-4 py-12">
+      <div className="text-center mb-6">
+        <div className="mb-wordmark mb-serif" style={{ fontSize: 40 }}>
+          Mera<span className="dot" /><span className="accent">Bazaar</span>
+        </div>
+        <div className="text-[12px] mt-1 uppercase tracking-[0.2em] text-[color:var(--mb-muted-fg)]">
+          {t("tagline")}
+        </div>
       </div>
-      <div className="mb-card p-6">
-        <h1 className="text-[24px] font-medium mb-4">{t("sign_in")}</h1>
-        <form onSubmit={submit} className="space-y-3">
+      <div className="mb-card p-8">
+        <h1 className="mb-serif text-[30px] font-semibold mb-1">{t("sign_in")}</h1>
+        <p className="text-[13px] text-[color:var(--mb-muted-fg)] mb-6">
+          {t("hello_sign_in")}
+        </p>
+        <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-[13px] font-bold mb-1" htmlFor="email">{t("email")}</label>
+            <label className="block text-[12px] font-semibold uppercase tracking-wider text-[color:var(--mb-muted-fg)] mb-1.5" htmlFor="email">
+              {t("email")}
+            </label>
             <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                   className="w-full border border-[#B7BEC5] rounded px-3 py-2 bg-white"
+                   className="w-full border border-[color:var(--mb-border)] rounded-xl px-4 py-3 bg-[color:var(--mb-bg)] focus:bg-white transition-colors"
                    data-testid={TID.loginEmail} />
           </div>
           <div>
-            <label className="block text-[13px] font-bold mb-1" htmlFor="pw">{t("password")}</label>
+            <label className="block text-[12px] font-semibold uppercase tracking-wider text-[color:var(--mb-muted-fg)] mb-1.5" htmlFor="pw">
+              {t("password")}
+            </label>
             <input id="pw" type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-                   className="w-full border border-[#B7BEC5] rounded px-3 py-2 bg-white"
+                   className="w-full border border-[color:var(--mb-border)] rounded-xl px-4 py-3 bg-[color:var(--mb-bg)] focus:bg-white transition-colors"
                    data-testid={TID.loginPassword} />
           </div>
-          {error && <div className="text-[13px] text-[color:var(--mb-danger)]">{error}</div>}
+          {error && (
+            <div className="text-[13px] text-[color:var(--mb-danger)] bg-[color:var(--mb-danger)]/10 border border-[color:var(--mb-danger)]/25 px-3 py-2 rounded-lg">
+              {error}
+            </div>
+          )}
           <button type="submit" disabled={loading}
-                  className="mb-btn mb-btn-primary w-full" data-testid={TID.loginSubmit}>
+                  className="mb-btn mb-btn-primary w-full !py-3" data-testid={TID.loginSubmit}>
+            <LogIn size={16} strokeWidth={1.75} />
             {loading ? "…" : t("sign_in")}
           </button>
         </form>
-        <p className="text-[12px] text-[color:var(--mb-text-muted)] mt-4 leading-relaxed">
+        <p className="text-[12px] text-[color:var(--mb-muted-fg)] mt-5 leading-relaxed">
           By continuing, you agree to MeraBazaar&apos;s Conditions of Use and Privacy Notice.
         </p>
       </div>
-      <div className="mt-4 flex items-center gap-3">
-        <div className="flex-1 h-px bg-[#D5D9D9]" />
-        <div className="text-[12px] text-[color:var(--mb-text-muted)]">{t("new_to_mera")}</div>
-        <div className="flex-1 h-px bg-[#D5D9D9]" />
+      <div className="mt-6 flex items-center gap-3">
+        <div className="flex-1 h-px bg-[color:var(--mb-border)]" />
+        <div className="text-[12px] text-[color:var(--mb-muted-fg)] uppercase tracking-wider">{t("new_to_mera")}</div>
+        <div className="flex-1 h-px bg-[color:var(--mb-border)]" />
       </div>
-      <Link to="/register" className="mb-btn mb-btn-ghost w-full mt-3 block text-center">
+      <Link to="/register" className="mb-btn mb-btn-outline w-full mt-4">
         {t("create_account")}
       </Link>
     </div>

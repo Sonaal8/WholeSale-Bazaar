@@ -22,62 +22,64 @@ export default function Register() {
       setError(formatApiErrorDetail(err.response?.data?.detail) || err.message);
     } finally { setLoading(false); }
   };
-
   const bind = (k) => ({ value: form[k], onChange: (e) => setForm({ ...form, [k]: e.target.value }) });
+  const cls = "w-full border border-[color:var(--mb-border)] rounded-xl px-4 py-3 bg-[color:var(--mb-bg)] focus:bg-white transition-colors";
+  const lbl = "block text-[12px] font-semibold uppercase tracking-wider text-[color:var(--mb-muted-fg)] mb-1.5";
 
   return (
-    <div className="max-w-[440px] mx-auto px-4 py-8">
-      <div className="text-center mb-4">
-        <span className="mb-logo text-[26px]" style={{ color: "#0F1111" }}>
-          Mera<span style={{ color: "#FF9900" }}>Bazaar</span>
-          <span className="smile" />
-        </span>
+    <div className="max-w-[460px] mx-auto px-4 py-12">
+      <div className="text-center mb-6">
+        <div className="mb-wordmark mb-serif" style={{ fontSize: 40 }}>
+          Mera<span className="dot" /><span className="accent">Bazaar</span>
+        </div>
+        <div className="text-[12px] mt-1 uppercase tracking-[0.2em] text-[color:var(--mb-muted-fg)]">
+          {t("tagline")}
+        </div>
       </div>
-      <div className="mb-card p-6">
-        <h1 className="text-[24px] font-medium mb-4">{t("create_account")}</h1>
-        <form onSubmit={submit} className="space-y-3">
+      <div className="mb-card p-8">
+        <h1 className="mb-serif text-[30px] font-semibold mb-1">{t("create_account")}</h1>
+        <p className="text-[13px] text-[color:var(--mb-muted-fg)] mb-6">
+          {t("new_to_mera")}
+        </p>
+        <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-[13px] font-bold mb-1">{t("name")}</label>
-            <input required {...bind("name")} className="w-full border border-[#B7BEC5] rounded px-3 py-2 bg-white"
-                   data-testid={TID.registerName} />
+            <label className={lbl}>{t("name")}</label>
+            <input required {...bind("name")} className={cls} data-testid={TID.registerName} />
           </div>
           <div>
-            <label className="block text-[13px] font-bold mb-1">{t("email")}</label>
-            <input type="email" required {...bind("email")}
-                   className="w-full border border-[#B7BEC5] rounded px-3 py-2 bg-white"
-                   data-testid={TID.registerEmail} />
+            <label className={lbl}>{t("email")}</label>
+            <input type="email" required {...bind("email")} className={cls} data-testid={TID.registerEmail} />
           </div>
           <div>
-            <label className="block text-[13px] font-bold mb-1">{t("phone")}</label>
-            <input {...bind("phone")} placeholder="+91…"
-                   className="w-full border border-[#B7BEC5] rounded px-3 py-2 bg-white"
-                   data-testid={TID.registerPhone} />
+            <label className={lbl}>{t("phone")}</label>
+            <input {...bind("phone")} placeholder="+91…" className={cls} data-testid={TID.registerPhone} />
           </div>
           <div>
-            <label className="block text-[13px] font-bold mb-1">{t("password")}</label>
-            <input type="password" required minLength={6} {...bind("password")}
-                   className="w-full border border-[#B7BEC5] rounded px-3 py-2 bg-white"
+            <label className={lbl}>{t("password")}</label>
+            <input type="password" required minLength={6} {...bind("password")} className={cls}
                    data-testid={TID.registerPassword} />
-            <div className="text-[11px] text-[color:var(--mb-text-muted)] mt-1">Passwords must be at least 6 characters.</div>
+            <div className="text-[11px] text-[color:var(--mb-muted-fg)] mt-1">Passwords must be at least 6 characters.</div>
           </div>
           <div>
-            <label className="block text-[13px] font-bold mb-1">Register as</label>
-            <select {...bind("role")}
-                    className="w-full border border-[#B7BEC5] rounded px-3 py-2 bg-white"
-                    data-testid={TID.registerRole}>
+            <label className={lbl}>Register as</label>
+            <select {...bind("role")} className={cls} data-testid={TID.registerRole}>
               <option value="seller">Seller</option>
               <option value="buyer">Buyer</option>
             </select>
           </div>
-          {error && <div className="text-[13px] text-[color:var(--mb-danger)]">{error}</div>}
+          {error && (
+            <div className="text-[13px] text-[color:var(--mb-danger)] bg-[color:var(--mb-danger)]/10 border border-[color:var(--mb-danger)]/25 px-3 py-2 rounded-lg">
+              {error}
+            </div>
+          )}
           <button type="submit" disabled={loading}
-                  className="mb-btn mb-btn-primary w-full" data-testid={TID.registerSubmit}>
+                  className="mb-btn mb-btn-primary w-full !py-3" data-testid={TID.registerSubmit}>
             {loading ? "…" : t("create_account")}
           </button>
         </form>
       </div>
-      <div className="mt-3 text-center text-[13px]">
-        <Link to="/login" className="text-[color:var(--mb-link)] hover:underline">{t("already_customer")}</Link>
+      <div className="mt-4 text-center text-[13px]">
+        <Link to="/login" className="text-[color:var(--mb-primary)] hover:underline">{t("already_customer")}</Link>
       </div>
     </div>
   );

@@ -1,17 +1,17 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { MapPin, Search, ChevronDown, ShoppingCart, User, Languages, Type } from "lucide-react";
+import { MapPin, Search, ShoppingBag, User, Languages, Type, Menu } from "lucide-react";
 import { useI18n } from "@/i18n";
 import { useAuth } from "@/context/AuthContext";
 import { TID } from "@/constants/testIds";
 
 const CATS = ["All", "Food", "Kirana", "Handicrafts", "Handloom", "Services", "Verified Sellers"];
 
-function Wordmark() {
+function Wordmark({ size = 26 }) {
   return (
-    <span className="mb-logo text-[26px] leading-none select-none">
-      Mera<span style={{ color: "#FF9900" }}>Bazaar</span>
-      <span className="smile" />
+    <span className="mb-wordmark mb-serif select-none" style={{ fontSize: size }}>
+      Mera<span className="dot" />
+      <span className="accent">Bazaar</span>
     </span>
   );
 }
@@ -23,6 +23,7 @@ export default function Header() {
   const loc = useLocation();
   const [pincode, setPincode] = useState(localStorage.getItem("mb.pincode") || "110001");
   const [q, setQ] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const search = (e) => {
     e?.preventDefault();
@@ -31,12 +32,7 @@ export default function Header() {
     if (pincode) params.set("pincode", pincode);
     nav(`/?${params.toString()}`);
   };
-
-  const savePincode = (v) => {
-    setPincode(v);
-    localStorage.setItem("mb.pincode", v);
-  };
-
+  const savePincode = (v) => { setPincode(v); localStorage.setItem("mb.pincode", v); };
   const isCatActive = (c) => {
     const sp = new URLSearchParams(loc.search);
     const cur = sp.get("category") || "All";
@@ -44,88 +40,89 @@ export default function Header() {
   };
 
   return (
-    <header className="w-full">
-      {/* Top navy bar */}
-      <div className="w-full" style={{ background: "#131921" }}>
-        <div className="max-w-[1500px] mx-auto flex items-center gap-2 px-3 py-2 text-white">
-          <Link to="/" className="p-1 rounded hover:outline hover:outline-1 hover:outline-white shrink-0"
-                data-testid={TID.logoLink} aria-label="MeraBazaar home">
-            <Wordmark />
-            <div className="text-[10px] text-[#cfd6dc] mt-1 leading-none pl-1 hidden sm:block">
-              {t("tagline")}
-            </div>
-          </Link>
+    <header className="w-full sticky top-0 z-40 backdrop-blur-md"
+            style={{ background: "rgba(250,250,245,0.92)", borderBottom: "1px solid var(--mb-border)" }}>
+      <div className="max-w-[1400px] mx-auto flex items-center gap-3 px-4 lg:px-8 py-3">
+        <Link to="/" className="flex flex-col items-start shrink-0" data-testid={TID.logoLink}
+              aria-label="MeraBazaar home">
+          <Wordmark size={30} />
+          <span className="text-[10px] tracking-[0.15em] uppercase text-[color:var(--mb-muted-fg)] mt-0.5 hidden sm:inline">
+            My Trusted Bazaar
+          </span>
+        </Link>
 
-          {/* Deliver-to pill */}
-          <button
-            className="mb-pill hidden md:inline-flex"
-            data-testid={TID.headerDeliverPill}
-            onClick={() => {
-              const v = prompt(`${t("deliver_to")} (pincode):`, pincode);
-              if (v && /^\d{6}$/.test(v)) savePincode(v);
-            }}
-          >
-            <span className="top flex items-center gap-1"><MapPin size={12} /> {t("deliver_to")}</span>
-            <span className="bot">{pincode}</span>
+        <button
+          className="mb-chip ml-1 hidden md:inline-flex"
+          data-testid={TID.headerDeliverPill}
+          onClick={() => {
+            const v = prompt(`${t("deliver_to")} (pincode):`, pincode);
+            if (v && /^\d{6}$/.test(v)) savePincode(v);
+          }}
+        >
+          <MapPin size={14} strokeWidth={1.75} />
+          <span className="flex flex-col leading-tight text-left">
+            <span className="lbl">{t("deliver_to")}</span>
+            <span className="val">{pincode}</span>
+          </span>
+        </button>
+
+        <form onSubmit={search} className="mb-search flex-1 max-w-2xl mx-1">
+          <select aria-label="Category" defaultValue="All">
+            {CATS.map((c) => <option key={c}>{c}</option>)}
+          </select>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t("search_placeholder")}
+            aria-label={t("search_placeholder")}
+            data-testid={TID.headerSearchInput}
+          />
+          <button type="submit" data-testid={TID.headerSearchSubmit}
+                  aria-label="Search"
+                  className="mb-btn mb-btn-primary !min-h-[36px] !py-2 !px-4">
+            <Search size={16} strokeWidth={2} />
           </button>
+        </form>
 
-          {/* Search */}
-          <form onSubmit={search} className="mb-search flex-1 mx-2">
-            <select aria-label="Category" defaultValue="All">
-              {CATS.map((c) => <option key={c}>{c}</option>)}
-            </select>
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t("search_placeholder")}
-              aria-label={t("search_placeholder")}
-              data-testid={TID.headerSearchInput}
-            />
-            <button type="submit" data-testid={TID.headerSearchSubmit} aria-label="Search">
-              <Search size={20} />
-            </button>
-          </form>
-
-          {/* Right pills */}
-          <button className="mb-pill" onClick={toggleLang} data-testid={TID.headerLangToggle}
-                  aria-label="Toggle language">
-            <span className="top flex items-center gap-1"><Languages size={12} /> {lang === "en" ? "EN" : "हि"}</span>
+        <div className="hidden lg:flex items-center gap-1">
+          <button className="mb-hpill" onClick={toggleLang}
+                  data-testid={TID.headerLangToggle} aria-label="Toggle language">
+            <span className="top flex items-center gap-1"><Languages size={12} strokeWidth={1.75} /> {lang === "en" ? "EN" : "हि"}</span>
             <span className="bot">{lang === "en" ? t("hindi") : t("english")}</span>
           </button>
-          <button className="mb-pill" onClick={toggleBig} data-testid={TID.headerBigTextToggle}
-                  aria-label="Toggle bigger text">
-            <span className="top flex items-center gap-1"><Type size={12} /> A11y</span>
+          <button className="mb-hpill" onClick={toggleBig}
+                  data-testid={TID.headerBigTextToggle} aria-label="Toggle bigger text">
+            <span className="top flex items-center gap-1"><Type size={12} strokeWidth={1.75} /> A11y</span>
             <span className="bot">{big ? t("normal_text") : t("big_text")}</span>
           </button>
-
-          {user ? (
-            <>
-              <Link to={user.role === "seller" || user.role === "admin" ? "/seller" : "/"}
-                    className="mb-pill" data-testid={TID.headerAccountPill}>
-                <span className="top">Hello, {user.name?.split(" ")[0]}</span>
-                <span className="bot flex items-center gap-1"><User size={14} /> {t("account_lists")}</span>
-              </Link>
-              <button className="mb-pill" onClick={logout} data-testid={TID.headerSignoutBtn}>
-                <span className="top">{t("logout")}</span>
-                <span className="bot">↩</span>
-              </button>
-            </>
-          ) : (
-            <Link to="/login" className="mb-pill" data-testid={TID.headerAccountPill}>
-              <span className="top">{t("hello_sign_in")}</span>
-              <span className="bot flex items-center gap-1">{t("account_lists")} <ChevronDown size={12} /></span>
-            </Link>
-          )}
-          <Link to="/" className="mb-pill" data-testid={TID.headerCartPill}>
-            <span className="top">0</span>
-            <span className="bot flex items-center gap-1"><ShoppingCart size={16} /> {t("cart")}</span>
-          </Link>
         </div>
+
+        {user ? (
+          <div className="flex items-center gap-1">
+            <Link to={user.role === "seller" || user.role === "admin" ? "/seller" : "/"}
+                  className="mb-hpill" data-testid={TID.headerAccountPill}>
+              <span className="top">Hello, {user.name?.split(" ")[0]}</span>
+              <span className="bot flex items-center gap-1"><User size={13} strokeWidth={1.75} /> {t("account_lists")}</span>
+            </Link>
+            <button className="mb-hpill" onClick={logout} data-testid={TID.headerSignoutBtn}>
+              <span className="top">{t("logout")}</span>
+              <span className="bot">↩</span>
+            </button>
+          </div>
+        ) : (
+          <Link to="/login" className="mb-btn mb-btn-outline hidden sm:inline-flex" data-testid={TID.headerAccountPill}>
+            <User size={14} strokeWidth={1.75} /> {t("sign_in")}
+          </Link>
+        )}
+        <Link to="/" className="mb-hpill" data-testid={TID.headerCartPill}>
+          <span className="top">0</span>
+          <span className="bot flex items-center gap-1"><ShoppingBag size={14} strokeWidth={1.75} /> {t("cart")}</span>
+        </Link>
       </div>
 
-      {/* Secondary nav strip */}
-      <div style={{ background: "#232F3E" }}>
-        <div className="max-w-[1500px] mx-auto px-3 py-1 flex items-center gap-1 overflow-x-auto">
+      {/* Category strip */}
+      <div className="border-t border-[color:var(--mb-border)] bg-[color:var(--mb-bg)]">
+        <div className="max-w-[1400px] mx-auto px-4 lg:px-8 flex items-center gap-6 overflow-x-auto">
           {CATS.map((c) => {
             const key = c.toLowerCase().replace(/\s+/g, "-");
             const label =
@@ -142,7 +139,7 @@ export default function Header() {
             const href = `/?${params.toString()}`;
             return (
               <Link key={c} to={href}
-                    className={`mb-cat-link ${isCatActive(c) ? "active" : ""}`}
+                    className={`mb-cat ${isCatActive(c) ? "active" : ""}`}
                     data-testid={TID.catLink(key)}>
                 {label}
               </Link>

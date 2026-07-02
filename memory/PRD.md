@@ -51,3 +51,15 @@ An Amazon-inspired verified-seller marketplace for Indian kirana, food, handicra
 
 ## Timeline
 - 2026-01-XX — MVP shipped: full Amazon-style shell + auth + listings + verification wizard + bilingual + a11y.
+
+## 2026-01 · Redesign to "Organic & Earthy" archetype
+Dropped the Amazon-clone aesthetic per user feedback ("make it more generic, self-made — not a whole copy of Amazon"). Redesigned end-to-end:
+- Palette: terracotta primary #C2533A + saffron #D97925 + sage #5C7E6A + bone #FAFAF5 + deep earth green footer #29362D (removed all navy #131921 / #232F3E)
+- Typography: **Cormorant Garamond** (headings, wordmark) + **Manrope** (body) + **Noto Sans/Serif Devanagari** (Hindi) — loaded via Google Fonts
+- Wordmark: elegant serif "Mera•Bazaar" with sage bullet + saffron "Bazaar" accent (replaces Amazon smile-arrow)
+- Trust ribbons: rotated wax-seal / stamp shape with dashed inset border (rounded 4/20/4/20 px asymmetric radius) — terracotta for identity, sage for government (replaces Amazon's-Choice triangle notch)
+- Header: light sticky bar with pill-shaped search + inline terracotta CTA + rounded pincode chip + text-underline category strip (no navy bars)
+- Home hero: asymmetric 3-tile Tetris grid (main spice image + Handloom side + Handicrafts side) with italic serif headline and gradient overlays
+- Product card: rounded-2xl white with elevated hover lift + terracotta shadow + saffron star row
+- Seller Dashboard: gradient greeting card + 3 stat tiles + terracotta-hover listing thumbnails + sage dot activity feed
+- Verify Wizard: warm gradient hero + circled step numbers turning sage when done + wax-seal ribbons on verified state
