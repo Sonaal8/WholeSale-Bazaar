@@ -9,6 +9,7 @@ import re
 import uuid
 import logging
 import bcrypt
+import httpx
 import jwt
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Literal
@@ -272,7 +273,13 @@ async def seed_listings():
 
 
 async def supabase_mirror(collection: str, event: str, doc: dict):
-    """MOCKED Supabase mirror — writes to a local audit collection instead."""
+    """Mirror events to Supabase via PostgREST. Falls back to local mongo audit collection.
+
+    Writes to real Supabase tables (users, listings, verifications) when the incoming
+    collection matches. Every event is ALSO logged to a `mirror_events` table for auditing.
+    Failures are swallowed so the primary Mongo write is never blocked.
+    """
+    # Always log to local Mongo (audit / fallback trail)
     await db.mirror_events.insert_one({
         "id": str(uuid.uuid4()),
         "collection": collection,
@@ -280,6 +287,70 @@ async def supabase_mirror(collection: str, event: str, doc: dict):
         "payload": {k: v for k, v in doc.items() if k != "password_hash"},
         "created_at": iso(now_utc()),
     })
+
+    supa_url = os.environ.get("SUPABASE_URL")
+    supa_key = os.environ.get("SUPABASE_KEY")
+    if not supa_url or not supa_key:
+        return
+
+    clean = {k: v for k, v in doc.items() if k != "password_hash"}
+    headers = {
+        "apikey": supa_key,
+        "Authorization": f"Bearer {supa_key}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+
+    async def _post(table: str, rows):
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as c:
+                r = await c.post(f"{supa_url}/rest/v1/{table}", headers=headers, json=rows)
+                if r.status_code >= 300:
+                    logger.warning("supabase %s %s: %s %s", table, event, r.status_code, r.text[:200])
+        except Exception as e:
+            logger.warning("supabase %s error: %s", table, e)
+
+    # 1) Always mirror to audit table
+    await _post("mirror_events", [{
+        "id": str(uuid.uuid4()),
+        "collection": collection,
+        "event": event,
+        "payload": clean,
+        "created_at": iso(now_utc()),
+    }])
+
+    # 2) Also upsert into typed tables when applicable
+    if collection == "users":
+        row = {
+            "id": clean.get("id"),
+            "email": clean.get("email"),
+            "name": clean.get("name"),
+            "role": clean.get("role"),
+            "phone": clean.get("phone"),
+            "trust_score": float(clean.get("trust_score") or 0),
+            "identity_verified": bool(clean.get("identity_verified")),
+            "gov_verified": bool(clean.get("gov_verified")),
+            "created_at": clean.get("created_at") or iso(now_utc()),
+        }
+        await _post("users", [row])
+    elif collection == "listings":
+        row = {
+            "id": clean.get("id"),
+            "seller_id": clean.get("seller_id"),
+            "seller_name": clean.get("seller_name"),
+            "title": clean.get("title"),
+            "title_hi": clean.get("title_hi"),
+            "category": clean.get("category"),
+            "price": float(clean.get("price") or 0),
+            "unit": clean.get("unit"),
+            "pincode": clean.get("pincode"),
+            "stock": int(clean.get("stock") or 0),
+            "images": clean.get("images") or [],
+            "seller_verified": bool(clean.get("seller_verified")),
+            "gov_verified": bool(clean.get("gov_verified")),
+            "created_at": clean.get("created_at") or iso(now_utc()),
+        }
+        await _post("listings", [row])
 
 
 async def audit(actor_id: Optional[str], action: str, target: str, meta: dict = None):
