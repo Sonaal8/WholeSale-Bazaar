@@ -1,0 +1,139 @@
+{
+  "project_name": "MeraBazaar",
+  "theme_and_archetype": {
+    "theme": "Light",
+    "archetype": "1 (Organic & Earthy)",
+    "description": "Warm, artisan-forward, hand-verified bazaar. Moving away from big-box tech minimalism (Amazon clone) to an editorial, culturally authentic, and trust-centered Indian marketplace aesthetic."
+  },
+  "color_palette": {
+    "background": "#FAFAF5",
+    "foreground": "#2C2420",
+    "primary": "#C2533A",
+    "primary_hover": "#A6432D",
+    "secondary": "#D97925",
+    "secondary_foreground": "#FFFFFF",
+    "accent": "#5C7E6A",
+    "accent_foreground": "#FFFFFF",
+    "surface": "#FFFFFF",
+    "border": "#E8E2D9",
+    "muted": "#F3EFEA",
+    "muted_foreground": "#7A7067",
+    "card": "#FFFFFF",
+    "card_foreground": "#2C2420",
+    "success": "#5C7E6A",
+    "warning": "#D97925"
+  },
+  "typography": {
+    "headings": {
+      "family": "Cormorant Garamond",
+      "weights": ["400", "500", "600", "700"],
+      "description": "Elegant serif conveying heritage, craftsmanship, and trust. Used for Hero headings, Section Titles, and Brand Wordmark."
+    },
+    "body": {
+      "family": "Manrope",
+      "weights": ["400", "500", "600"],
+      "description": "Clean, geometric sans-serif for high legibility in dense marketplace data (product titles, prices, descriptions, inputs)."
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-none",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight",
+      "h3": "text-xl sm:text-2xl",
+      "body": "text-base text-foreground leading-relaxed",
+      "small": "text-sm text-muted-foreground",
+      "label": "text-xs uppercase tracking-[0.15em] font-bold"
+    }
+  },
+  "spacing_and_layout": {
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "section_spacing": "py-16 md:py-24",
+    "border_radius": {
+      "base": "rounded-lg",
+      "card": "rounded-xl",
+      "button": "rounded-full"
+    },
+    "shadows": {
+      "soft": "shadow-[0_4px_20px_-4px_rgba(44,36,32,0.05)]",
+      "hover": "shadow-[0_8px_30px_-4px_rgba(194,83,58,0.15)]"
+    }
+  },
+  "components": {
+    "header": {
+      "layout": "Sticky, top-0, z-50. bg-[#FAFAF5] border-b border-[#E8E2D9]. No navy blue.",
+      "wordmark": "Cormorant Garamond, text-2xl font-bold text-[#C2533A].",
+      "search_bar": "Rounded-full, border border-[#E8E2D9] bg-white, focus-within:ring-2 focus-within:ring-[#C2533A]. Include primary CTA button (Terracotta) inside the search pill on the right.",
+      "pincode_chip": "Pill shape, bg-[#F3EFEA] text-[#2C2420] flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium.",
+      "category_strip": "Horizontal scrollable list. Manrope text-sm font-medium text-[#7A7067]. Active item gets text-[#C2533A] and a bottom border."
+    },
+    "trust_ribbons": {
+      "shape": "Scalloped-edge badge or organic 'wax seal' shape using CSS mask-image, SVG, or rounded-br-2xl rounded-tl-2xl instead of generic sharp ribbons.",
+      "colors": "Identity Verified = Terracotta (#C2533A) bg, White text. FSSAI/GSTIN Verified = Sage Green (#5C7E6A) bg, White text.",
+      "typography": "Manrope text-xs font-bold uppercase tracking-wider.",
+      "animation": "Stamp press effect on click/hover (scale-95, slight rotation)."
+    },
+    "product_card": {
+      "container": "bg-white rounded-xl border border-[#E8E2D9] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_-4px_rgba(194,83,58,0.15)] hover:-translate-y-1 group",
+      "image": "aspect-square w-full object-cover rounded-t-xl",
+      "content": "p-5 flex flex-col gap-2",
+      "title": "Manrope font-semibold text-[#2C2420] line-clamp-2 leading-tight",
+      "price": "text-lg font-bold text-[#2C2420]",
+      "cta": "w-full rounded-full bg-[#C2533A] text-white py-2.5 font-semibold transition-colors hover:bg-[#A6432D] flex items-center justify-center gap-2",
+      "pincode_line": "text-xs text-[#7A7067] flex items-center gap-1 mt-1"
+    },
+    "hero": {
+      "layout": "Asymmetric 'Tetris' Grid (Mode A). Not a standard full-width banner.",
+      "main_image": "col-span-full md:col-span-8 row-span-2 relative rounded-2xl overflow-hidden",
+      "overlay": "bg-gradient-to-r from-black/60 via-black/30 to-transparent",
+      "text_content": "Absolute positioned over the gradient, left aligned. Large Cormorant H1, Manrope subtitle.",
+      "side_cards": "col-span-4 row-span-1 bg-[#F3EFEA] rounded-2xl p-6 flex flex-col justify-center border border-[#E8E2D9]"
+    },
+    "forms": {
+      "inputs": "bg-[#FAFAF5] border border-[#E8E2D9] rounded-lg px-4 py-3 focus:ring-2 focus:ring-[#C2533A] focus:border-transparent transition-all",
+      "cards": "bg-white border border-[#E8E2D9] rounded-2xl p-8 shadow-soft"
+    },
+    "footer": {
+      "layout": "bg-[#29362D] (Deep Earthy Green) text-[#F3EFEA]. 4-column grid.",
+      "headings": "Cormorant Garamond text-xl mb-4 text-white",
+      "links": "Manrope text-sm text-[#F3EFEA]/80 hover:text-white transition-colors"
+    }
+  },
+  "micro_interactions": {
+    "hover_states": "All buttons should have a slight background darkening. Product cards lift up and gain a warm, terracotta-tinted shadow.",
+    "trust_badges": "Stamp animation: hover triggers a very slight scale-up, active triggers a scale-95 'press' effect.",
+    "page_load": "Staggered fade-up for product grids using framer-motion."
+  },
+  "imagery": [
+    {
+      "url": "https://images.pexels.com/photos/5504609/pexels-photo-5504609.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "category": "hero_background",
+      "description": "Colorful powdered spices on display. Use for Kirana/Food section or main hero banner."
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1640292343595-889db1c8262e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHwyfHxpbmRpYW4lMjBoYW5kbG9vbSUyMHRleHRpbGV8ZW58MHx8fHwxNzgzMDI3OTgzfDA&ixlib=rb-4.1.0&q=85",
+      "category": "hero_secondary",
+      "description": "Man working on a weaving machine. Great for Handloom category feature or side card in hero grid."
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1678296728930-775d299daaca?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzF8MHwxfHNlYXJjaHw0fHxpbmRpYW4lMjBoYW5kbG9vbSUyMHRleHRpbGV8ZW58MHx8fHwxNzgzMDI3OTgzfDA&ixlib=rb-4.1.0&q=85",
+      "category": "product_handicraft",
+      "description": "Potter's hands on a wheel. Use for Handicrafts category or as a product sample."
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1717585679395-bbe39b5fb6bc?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHw0fHxpbmRpYW4lMjBoYW5kbG9vbSUyMHRleHRpbGV8ZW58MHx8fHwxNzgzMDI3OTgzfDA&ixlib=rb-4.1.0&q=85",
+      "category": "product_textile",
+      "description": "Pile of Indian textiles. Use as a product image placeholder."
+    }
+  ],
+  "accessibility_and_testing": {
+    "contrast": "Ensure text over the warm background (#FAFAF5) meets APCA contrast standards. Terracotta (#C2533A) against white is accessible.",
+    "data_testid": "MANDATORY: All interactive elements (buttons, links, search bars, category tabs, toggles) must have data-testid attributes in kebab-case."
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the color palette. Do NOT use the default Tailwind blue, gray, or the old Amazon navy/orange.",
+    "Implement the Header exactly as described: sticky, solid warm background, pill-shaped search, and distinct typography.",
+    "Use 'Cormorant Garamond' for headings and 'Manrope' for body. Ensure these are loaded in the project (e.g., via Google Fonts in index.html).",
+    "Replace generic ribbon shapes with organic 'scalloped' or 'stamp/seal' styled elements for Trust Badges.",
+    "Ensure the hero section uses an asymmetrical grid (like Tetris mode) with high-quality imagery and a gradient overlay for text readability.",
+    "Add 'data-testid' to every interactive element.",
+    "Use lucide-react icons with a stroke width of 1.5 to maintain an elegant, crafted feel."
+  ]
+}
