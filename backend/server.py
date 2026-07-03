@@ -284,7 +284,7 @@ async def supabase_mirror(collection: str, event: str, doc: dict):
         "id": str(uuid.uuid4()),
         "collection": collection,
         "event": event,
-        "payload": {k: v for k, v in doc.items() if k != "password_hash"},
+        "payload": {k: v for k, v in doc.items() if k not in ("password_hash", "_id")},
         "created_at": iso(now_utc()),
     })
 
@@ -293,7 +293,7 @@ async def supabase_mirror(collection: str, event: str, doc: dict):
     if not supa_url or not supa_key:
         return
 
-    clean = {k: v for k, v in doc.items() if k != "password_hash"}
+    clean = {k: v for k, v in doc.items() if k not in ("password_hash", "_id")}
     headers = {
         "apikey": supa_key,
         "Authorization": f"Bearer {supa_key}",
@@ -301,10 +301,13 @@ async def supabase_mirror(collection: str, event: str, doc: dict):
         "Prefer": "resolution=merge-duplicates,return=minimal",
     }
 
-    async def _post(table: str, rows):
+    async def _post(table: str, rows, on_conflict: str = None):
         try:
             async with httpx.AsyncClient(timeout=8.0) as c:
-                r = await c.post(f"{supa_url}/rest/v1/{table}", headers=headers, json=rows)
+                url = f"{supa_url}/rest/v1/{table}"
+                if on_conflict:
+                    url += f"?on_conflict={on_conflict}"
+                r = await c.post(url, headers=headers, json=rows)
                 if r.status_code >= 300:
                     logger.warning("supabase %s %s: %s %s", table, event, r.status_code, r.text[:200])
         except Exception as e:
@@ -475,7 +478,8 @@ async def aadhaar_confirm(body: AadhaarVerifyBody, user: dict = Depends(get_curr
     )
     await db.otp_store.delete_one({"user_id": user["id"], "purpose": "aadhaar"})
     await audit(user["id"], "aadhaar.confirm", "verification")
-    await supabase_mirror("users", "update", {"id": user["id"], "identity_verified": True})
+    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    await supabase_mirror("users", "update", fresh)
     return {"ok": True, "identity_verified": True}
 
 
@@ -489,7 +493,8 @@ async def verify_fssai(body: FssaiBody, user: dict = Depends(get_current_user)):
         {"$set": {"gov_verified": True, "fssai_number": body.fssai_number, "fssai_status": "VERIFIED"}},
     )
     await audit(user["id"], "fssai.verify", "verification", {"fssai": body.fssai_number})
-    await supabase_mirror("users", "update", {"id": user["id"], "gov_verified": True})
+    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    await supabase_mirror("users", "update", fresh)
     return {"ok": True, "status": "VERIFIED", "kind": "FSSAI"}
 
 
@@ -504,7 +509,8 @@ async def verify_gstin(body: GstinBody, user: dict = Depends(get_current_user)):
         {"$set": {"gov_verified": True, "gstin": gstin, "gstin_status": "VERIFIED"}},
     )
     await audit(user["id"], "gstin.verify", "verification", {"gstin": gstin})
-    await supabase_mirror("users", "update", {"id": user["id"], "gov_verified": True})
+    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    await supabase_mirror("users", "update", fresh)
     return {"ok": True, "status": "VERIFIED", "kind": "GSTIN"}
 
 
