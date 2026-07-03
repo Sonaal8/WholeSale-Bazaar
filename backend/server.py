@@ -604,10 +604,12 @@ async def on_shutdown():
 
 app.include_router(api)
 
+_cors_origins = os.environ.get("CORS_ORIGINS", "*").split(",")
+_wildcard = "*" in _cors_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_credentials=not _wildcard,  # browsers reject credentials with wildcard origins
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
