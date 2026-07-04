@@ -22,9 +22,146 @@ from pydantic import BaseModel, Field, EmailStr
 # ---------------------------------------------------------------------------
 # DB
 # ---------------------------------------------------------------------------
-mongo_url = os.environ["MONGO_URL"]
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ["DB_NAME"]]
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_SECRET_KEY")
+SUPABASE_API = f"{SUPABASE_URL.rstrip('/')}/rest/v1" if SUPABASE_URL else None
+SUPABASE_HEADERS = {
+    "apikey": SUPABASE_KEY or "",
+    "Authorization": f"Bearer {SUPABASE_KEY}" if SUPABASE_KEY else "",
+    "Content-Type": "application/json",
+}
+USE_SUPABASE = bool(SUPABASE_API and SUPABASE_KEY)
+
+if USE_SUPABASE:
+    client = None
+    db = None
+else:
+    mongo_url = os.environ["MONGO_URL"]
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[os.environ["DB_NAME"]]
+
+async def supabase_request(method: str, path: str, json=None, params: dict | None = None, prefer_representation: bool = False, timeout: int = 30):
+    if not SUPABASE_API or not SUPABASE_KEY:
+        raise RuntimeError("Supabase is not configured. Set SUPABASE_URL and SUPABASE_KEY.")
+    url = path if path.startswith("http") else f"{SUPABASE_API}/{path.lstrip('/') }"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    if prefer_representation:
+        headers["Prefer"] = "return=representation"
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.request(method, url, headers=headers, params=params, json=json)
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=resp.status_code, detail=f"Supabase error: {resp.text}")
+    if resp.status_code == 204 or not resp.text:
+        return None
+    return resp.json()
+
+async def supabase_select(table: str, filters: dict | None = None, extra_params: dict | None = None):
+    params = {"select": "*"}
+    if filters:
+        params.update(filters)
+    if extra_params:
+        params.update(extra_params)
+    return await supabase_request("GET", table, params=params)
+
+async def supabase_get_one(table: str, filters: dict | None = None):
+    rows = await supabase_select(table, filters, {"limit": "1"})
+    return rows[0] if rows else None
+
+async def supabase_insert(table: str, rows, on_conflict: str | None = None):
+    params = {}
+    if on_conflict:
+        params["on_conflict"] = on_conflict
+    return await supabase_request("POST", table, json=rows, params=params, prefer_representation=True)
+
+async def supabase_update(table: str, filters: dict, values: dict):
+    return await supabase_request("PATCH", table, json=values, params=filters, prefer_representation=True)
+
+async def supabase_delete(table: str, filters: dict):
+    return await supabase_request("DELETE", table, params=filters)
+
+async def supabase_count(table: str, filters: dict | None = None):
+    rows = await supabase_select(table, filters, {"select": "id", "limit": "1"})
+    return len(rows)
+
+async def db_find_one(table: str, query: dict):
+    if USE_SUPABASE:
+        filters = {k: f"eq.{v}" for k, v in query.items()}
+        return await supabase_get_one(table, filters)
+    return await db[table].find_one(query, {"_id": 0})
+
+async def db_insert_one(table: str, doc: dict):
+    if USE_SUPABASE:
+        rows = await supabase_insert(table, [doc])
+        return rows[0] if rows else None
+    return await db[table].insert_one(doc)
+
+async def db_insert_many(table: str, docs: list[dict]):
+    if USE_SUPABASE:
+        return await supabase_insert(table, docs)
+    return await db[table].insert_many(docs)
+
+async def db_update_one(table: str, query: dict, update: dict, upsert: bool = False):
+    if USE_SUPABASE:
+        values = {}
+        if "$set" in update:
+            values.update(update["$set"])
+        if "$inc" in update:
+            existing = await db_find_one(table, query)
+            if existing is None:
+                if upsert:
+                    values.update({k: v for k, v in update.get("$set", {}).items()})
+                    for k, v in update.get("$inc", {}).items():
+                        values[k] = v
+                    merged = {**query, **values}
+                    return await db_insert_one(table, merged)
+                raise HTTPException(status_code=404, detail="Document not found")
+            for k, v in update["$inc"].items():
+                values[k] = int(existing.get(k, 0) or 0) + v
+        if not values:
+            return None
+        filters = {k: f"eq.{v}" for k, v in query.items()}
+        return await supabase_update(table, filters, values)
+    return await db[table].update_one(query, update, upsert=upsert)
+
+async def db_delete_one(table: str, query: dict):
+    if USE_SUPABASE:
+        filters = {k: f"eq.{v}" for k, v in query.items()}
+        return await supabase_delete(table, filters)
+    return await db[table].delete_one(query)
+
+async def db_find(table: str, query: dict, projection=None, limit: int = 50, sort: tuple | None = None, extra_params: dict | None = None):
+    if USE_SUPABASE:
+        filters = {}
+        if query:
+            for k, v in query.items():
+                if isinstance(v, dict) and "$regex" in v:
+                    pattern = v["$regex"]
+                    if v.get("$options", "").lower() == "i":
+                        filters[k] = f"ilike.*{pattern}*"
+                    else:
+                        filters[k] = f"like.*{pattern}*"
+                else:
+                    filters[k] = f"eq.{v}"
+        params = extra_params.copy() if extra_params else {}
+        params["limit"] = str(limit)
+        if sort:
+            params["order"] = f"{sort[0]}.{sort[1].lower()}"
+        return await supabase_select(table, filters, params)
+    cursor = db[table].find(query, projection)
+    if sort:
+        cursor.sort(sort[0], 1 if sort[1].lower() == "asc" else -1)
+    return await cursor.to_list(limit)
+
+async def db_count_documents(table: str, query: dict):
+    if USE_SUPABASE:
+        rows = await supabase_select(table, {k: f"eq.{v}" for k, v in query.items()}, {"select": "id", "limit": "1"})
+        return len(rows)
+    return await db[table].count_documents(query)
 
 # ---------------------------------------------------------------------------
 # App
@@ -93,9 +230,11 @@ async def get_current_user(request: Request) -> dict:
         payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Invalid token type")
-        user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+        user = await db_find_one("users", {"id": payload["sub"]})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
+        user.pop("password_hash", None)
+        user.pop("_id", None)
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
@@ -185,16 +324,17 @@ async def seed_users():
         },
     ]
     for s in seeds:
-        existing = await db.users.find_one({"email": s["email"]})
+        existing = await db_find_one("users", {"email": s["email"]})
         if existing:
             if not verify_password(s["password"], existing.get("password_hash", "")):
-                await db.users.update_one(
+                await db_update_one(
+                    "users",
                     {"email": s["email"]},
                     {"$set": {"password_hash": hash_password(s["password"])}},
                 )
             continue
         uid = str(uuid.uuid4())
-        await db.users.insert_one({
+        await db_insert_one("users", {
             "id": uid,
             "email": s["email"],
             "password_hash": hash_password(s["password"]),
@@ -208,9 +348,9 @@ async def seed_users():
 
 
 async def seed_listings():
-    if await db.listings.count_documents({}) > 0:
+    if await db_count_documents("listings", {}) > 0:
         return
-    seller = await db.users.find_one({"email": os.environ["SELLER_EMAIL"].lower()})
+    seller = await db_find_one("users", {"email": os.environ["SELLER_EMAIL"].lower()})
     if not seller:
         return
     samples = [
@@ -269,7 +409,7 @@ async def seed_listings():
             "upi_id": "merabazaar@upi",
             **s,
         })
-    await db.listings.insert_many(docs)
+    await db_insert_many("listings", docs)
 
 
 async def supabase_mirror(collection: str, event: str, doc: dict):
@@ -279,8 +419,8 @@ async def supabase_mirror(collection: str, event: str, doc: dict):
     collection matches. Every event is ALSO logged to a `mirror_events` table for auditing.
     Failures are swallowed so the primary Mongo write is never blocked.
     """
-    # Always log to local Mongo (audit / fallback trail)
-    await db.mirror_events.insert_one({
+    # Always log the mirror event to the active backend store
+    await db_insert_one("mirror_events", {
         "id": str(uuid.uuid4()),
         "collection": collection,
         "event": event,
@@ -289,7 +429,7 @@ async def supabase_mirror(collection: str, event: str, doc: dict):
     })
 
     supa_url = os.environ.get("SUPABASE_URL")
-    supa_key = os.environ.get("SUPABASE_KEY")
+    supa_key = os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_SECRET_KEY")
     if not supa_url or not supa_key:
         return
 
@@ -357,7 +497,7 @@ async def supabase_mirror(collection: str, event: str, doc: dict):
 
 
 async def audit(actor_id: Optional[str], action: str, target: str, meta: dict = None):
-    await db.activity_log.insert_one({
+    await db_insert_one("activity_log", {
         "id": str(uuid.uuid4()),
         "actor_id": actor_id,
         "action": action,
@@ -379,7 +519,7 @@ async def root():
 @api.post("/auth/register")
 async def register(body: RegisterBody, response: Response):
     email = body.email.lower()
-    if await db.users.find_one({"email": email}):
+    if await db_find_one("users", {"email": email}):
         raise HTTPException(status_code=400, detail="Email already registered")
     uid = str(uuid.uuid4())
     user_doc = {
@@ -394,7 +534,7 @@ async def register(body: RegisterBody, response: Response):
         "identity_verified": False,
         "gov_verified": False,
     }
-    await db.users.insert_one(user_doc)
+    await db_insert_one("users", user_doc)
     await supabase_mirror("users", "insert", user_doc)
     await audit(uid, "register", "user", {"email": email})
     access = create_access_token(uid, email, body.role)
@@ -413,7 +553,7 @@ async def login(body: LoginBody, response: Response, request: Request):
     # Key by email alone so lockout survives k8s replica switching.
     ident = f"email:{email}"
 
-    attempts_doc = await db.login_attempts.find_one({"identifier": ident})
+    attempts_doc = await db_find_one("login_attempts", {"identifier": ident})
     if attempts_doc and attempts_doc.get("count", 0) >= 5:
         last = attempts_doc.get("last_at")
         if last:
@@ -421,16 +561,17 @@ async def login(body: LoginBody, response: Response, request: Request):
             if now_utc() - last_dt < timedelta(minutes=15):
                 raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
 
-    user = await db.users.find_one({"email": email})
+    user = await db_find_one("users", {"email": email})
     if not user or not verify_password(body.password, user.get("password_hash", "")):
-        await db.login_attempts.update_one(
+        await db_update_one(
+            "login_attempts",
             {"identifier": ident},
             {"$inc": {"count": 1}, "$set": {"last_at": iso(now_utc())}},
             upsert=True,
         )
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    await db.login_attempts.delete_one({"identifier": ident})
+    await db_delete_one("login_attempts", {"identifier": ident})
     access = create_access_token(user["id"], user["email"], user["role"])
     refresh = create_refresh_token(user["id"])
     set_auth_cookies(response, access, refresh)
@@ -458,7 +599,8 @@ async def aadhaar_init(body: AadhaarInitBody, user: dict = Depends(get_current_u
     if not re.fullmatch(r"\d{12}", body.aadhaar_number):
         raise HTTPException(status_code=400, detail="Aadhaar must be 12 digits")
     # MOCKED OKYC — otp is always 123456
-    await db.otp_store.update_one(
+    await db_update_one(
+        "otp_store",
         {"user_id": user["id"], "purpose": "aadhaar"},
         {"$set": {"aadhaar": body.aadhaar_number, "otp": "123456", "created_at": iso(now_utc())}},
         upsert=True,
@@ -469,16 +611,19 @@ async def aadhaar_init(body: AadhaarInitBody, user: dict = Depends(get_current_u
 
 @api.post("/verify/aadhaar/confirm")
 async def aadhaar_confirm(body: AadhaarVerifyBody, user: dict = Depends(get_current_user)):
-    doc = await db.otp_store.find_one({"user_id": user["id"], "purpose": "aadhaar"})
+    doc = await db_find_one("otp_store", {"user_id": user["id"], "purpose": "aadhaar"})
     if not doc or doc.get("otp") != body.otp:
         raise HTTPException(status_code=400, detail="Invalid OTP")
-    await db.users.update_one(
+    await db_update_one(
+        "users",
         {"id": user["id"]},
         {"$set": {"identity_verified": True, "aadhaar_masked": "XXXX-XXXX-" + body.aadhaar_number[-4:]}},
     )
-    await db.otp_store.delete_one({"user_id": user["id"], "purpose": "aadhaar"})
+    await db_delete_one("otp_store", {"user_id": user["id"], "purpose": "aadhaar"})
     await audit(user["id"], "aadhaar.confirm", "verification")
-    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    fresh = await db_find_one("users", {"id": user["id"]})
+    fresh.pop("password_hash", None)
+    fresh.pop("_id", None)
     await supabase_mirror("users", "update", fresh)
     return {"ok": True, "identity_verified": True}
 
@@ -488,12 +633,15 @@ async def verify_fssai(body: FssaiBody, user: dict = Depends(get_current_user)):
     # FSSAI numbers are 14 digits
     if not re.fullmatch(r"\d{14}", body.fssai_number):
         raise HTTPException(status_code=400, detail="FSSAI must be 14 digits")
-    await db.users.update_one(
+    await db_update_one(
+        "users",
         {"id": user["id"]},
         {"$set": {"gov_verified": True, "fssai_number": body.fssai_number, "fssai_status": "VERIFIED"}},
     )
     await audit(user["id"], "fssai.verify", "verification", {"fssai": body.fssai_number})
-    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    fresh = await db_find_one("users", {"id": user["id"]})
+    fresh.pop("password_hash", None)
+    fresh.pop("_id", None)
     await supabase_mirror("users", "update", fresh)
     return {"ok": True, "status": "VERIFIED", "kind": "FSSAI"}
 
@@ -504,12 +652,15 @@ async def verify_gstin(body: GstinBody, user: dict = Depends(get_current_user)):
     if not re.fullmatch(r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{1}Z[0-9A-Z]{1}$", body.gstin.upper()):
         raise HTTPException(status_code=400, detail="Invalid GSTIN format")
     gstin = body.gstin.upper()
-    await db.users.update_one(
+    await db_update_one(
+        "users",
         {"id": user["id"]},
         {"$set": {"gov_verified": True, "gstin": gstin, "gstin_status": "VERIFIED"}},
     )
     await audit(user["id"], "gstin.verify", "verification", {"gstin": gstin})
-    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    fresh = await db_find_one("users", {"id": user["id"]})
+    fresh.pop("password_hash", None)
+    fresh.pop("_id", None)
     await supabase_mirror("users", "update", fresh)
     return {"ok": True, "status": "VERIFIED", "kind": "GSTIN"}
 
@@ -534,13 +685,13 @@ async def list_listings(
             {"title_hi": {"$regex": q, "$options": "i"}},
             {"description": {"$regex": q, "$options": "i"}},
         ]
-    docs = await db.listings.find(query, {"_id": 0}).limit(limit).to_list(limit)
+    docs = await db_find("listings", query, {"_id": 0}, limit=limit)
     return docs
 
 
 @api.get("/listings/{listing_id}")
 async def get_listing(listing_id: str):
-    doc = await db.listings.find_one({"id": listing_id}, {"_id": 0})
+    doc = await db_find_one("listings", {"id": listing_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Listing not found")
     return doc
@@ -563,7 +714,7 @@ async def create_listing(body: ListingBody, user: dict = Depends(get_current_use
         "upi_id": "merabazaar@upi",
         **body.model_dump(),
     }
-    await db.listings.insert_one(doc)
+    await db_insert_one("listings", doc)
     await supabase_mirror("listings", "insert", doc)
     await audit(user["id"], "listing.create", "listing", {"id": doc["id"]})
     doc.pop("_id", None)
@@ -573,14 +724,14 @@ async def create_listing(body: ListingBody, user: dict = Depends(get_current_use
 @api.get("/seller/listings")
 async def my_listings(user: dict = Depends(get_current_user)):
     await require_role(user, ["seller", "admin"])
-    docs = await db.listings.find({"seller_id": user["id"]}, {"_id": 0}).to_list(200)
+    docs = await db_find("listings", {"seller_id": user["id"]}, limit=200)
     return docs
 
 
 @api.get("/activity")
 async def activity(user: dict = Depends(get_current_user), limit: int = 50):
     q = {} if user.get("role") == "admin" else {"actor_id": user["id"]}
-    docs = await db.activity_log.find(q, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    docs = await db_find("activity_log", q, limit=limit, sort=("created_at", "desc"))
     return docs
 
 
@@ -589,17 +740,19 @@ async def activity(user: dict = Depends(get_current_user), limit: int = 50):
 # ---------------------------------------------------------------------------
 @app.on_event("startup")
 async def on_startup():
-    await db.users.create_index("email", unique=True)
-    await db.listings.create_index("pincode")
-    await db.listings.create_index("category")
-    await db.login_attempts.create_index("identifier")
+    if not USE_SUPABASE and db is not None:
+        await db.users.create_index("email", unique=True)
+        await db.listings.create_index("pincode")
+        await db.listings.create_index("category")
+        await db.login_attempts.create_index("identifier")
     await seed_users()
     await seed_listings()
 
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    client.close()
+    if client is not None:
+        client.close()
 
 
 app.include_router(api)
