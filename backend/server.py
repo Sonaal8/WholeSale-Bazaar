@@ -19,6 +19,102 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 
+
+class InMemoryCursor:
+    def __init__(self, docs):
+        self.docs = docs
+
+    def sort(self, *args):
+        return self
+
+    async def to_list(self, limit=None):
+        docs = self.docs[:limit] if limit is not None else self.docs
+        return [dict(doc) for doc in docs]
+
+
+class InMemoryCollection:
+    def __init__(self, name):
+        self.name = name
+        self._docs = []
+
+    async def create_index(self, *args, **kwargs):
+        return None
+
+    async def find_one(self, query=None, projection=None):
+        for doc in self._docs:
+            if self._matches(doc, query or {}):
+                return dict(doc)
+        return None
+
+    def find(self, query=None, projection=None):
+        docs = [doc for doc in self._docs if self._matches(doc, query or {})]
+        return InMemoryCursor(docs)
+
+    async def insert_one(self, doc):
+        self._docs.append(dict(doc))
+        return None
+
+    async def insert_many(self, docs):
+        self._docs.extend(dict(doc) for doc in docs)
+        return None
+
+    async def update_one(self, query, update, upsert=False):
+        for doc in self._docs:
+            if self._matches(doc, query):
+                if "$set" in update:
+                    doc.update(update["$set"])
+                if "$inc" in update:
+                    for key, value in update["$inc"].items():
+                        doc[key] = int(doc.get(key, 0) or 0) + value
+                return None
+        if upsert:
+            new_doc = dict(query)
+            if "$set" in update:
+                new_doc.update(update["$set"])
+            if "$inc" in update:
+                for key, value in update["$inc"].items():
+                    new_doc[key] = int(new_doc.get(key, 0) or 0) + value
+            self._docs.append(new_doc)
+        return None
+
+    async def delete_one(self, query):
+        for index, doc in enumerate(self._docs):
+            if self._matches(doc, query):
+                del self._docs[index]
+                break
+        return None
+
+    async def count_documents(self, query=None):
+        return sum(1 for doc in self._docs if self._matches(doc, query or {}))
+
+    def _matches(self, doc, query):
+        for key, expected in (query or {}).items():
+            if isinstance(expected, dict):
+                if "$regex" in expected:
+                    pattern = expected["$regex"]
+                    flags = expected.get("$options", "")
+                    if not re.search(pattern, str(doc.get(key, "")), flags=re.I if "i" in flags.lower() else 0):
+                        return False
+                else:
+                    return False
+            elif doc.get(key) != expected:
+                return False
+        return True
+
+
+class InMemoryDatabase:
+    def __init__(self):
+        self._collections = {}
+
+    def __getitem__(self, name):
+        if name not in self._collections:
+            self._collections[name] = InMemoryCollection(name)
+        return self._collections[name]
+
+    def __getattr__(self, name):
+        return self[name]
+
+
 # ---------------------------------------------------------------------------
 # DB
 # ---------------------------------------------------------------------------
@@ -36,9 +132,13 @@ if USE_SUPABASE:
     client = None
     db = None
 else:
-    mongo_url = os.environ["MONGO_URL"]
-    client = AsyncIOMotorClient(mongo_url)
-    db = client[os.environ["DB_NAME"]]
+    mongo_url = os.environ.get("MONGO_URL", "").strip()
+    if mongo_url:
+        client = AsyncIOMotorClient(mongo_url)
+        db = client[os.environ.get("DB_NAME", "merabazaar")]
+    else:
+        client = None
+        db = InMemoryDatabase()
 
 async def supabase_request(method: str, path: str, json=None, params: dict | None = None, prefer_representation: bool = False, timeout: int = 30):
     if not SUPABASE_API or not SUPABASE_KEY:
