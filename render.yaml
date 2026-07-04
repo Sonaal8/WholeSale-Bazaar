@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: wholesalebazaar-backend
+    env: python
+    plan: free
+    rootDir: backend
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "python -m uvicorn server:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /api/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: MONGO_URL
+        value: ""
+      - key: DB_NAME
+        value: merabazaar
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        value: admin@bazaarly.in
+      - key: ADMIN_PASSWORD
+        value: Admin@1234
+      - key: SELLER_EMAIL
+        value: seller@bazaarly.in
+      - key: SELLER_PASSWORD
+        value: Seller@1234
+      - key: CORS_ORIGINS
+        value: https://wholesalebazaar-frontend.onrender.com,http://localhost:3000
+
+  - type: static
+    name: wholesalebazaar-frontend
+    plan: free
+    rootDir: frontend
+    buildCommand: "npm install --legacy-peer-deps && npm run build"
+    staticPublishPath: build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_BACKEND_URL
+        value: https://wholesalebazaar-backend.onrender.com
